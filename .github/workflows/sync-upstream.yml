@@ -1,0 +1,47 @@
+name: Sync from upstream
+
+# Pulls codejunkie99/agentic-stack into this public mirror.
+# Runs daily and on manual dispatch. Fast-forward only — fails loudly if
+# upstream force-pushes (rare; alerts you to investigate).
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # daily at 06:00 UTC
+  workflow_dispatch:       # also run on demand from Actions tab
+
+permissions:
+  contents: write          # push merged commits back
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history needed for merge
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/codejunkie99/agentic-stack.git
+
+      - name: Fetch upstream
+        run: git fetch upstream master --tags
+
+      - name: Fast-forward merge
+        run: |
+          BEHIND=$(git rev-list --count HEAD..upstream/master)
+          if [ "$BEHIND" -eq 0 ]; then
+            echo "already current with upstream — nothing to do"
+            exit 0
+          fi
+          echo "→ behind by $BEHIND commit(s); fast-forwarding"
+          git merge --ff-only upstream/master
+
+      - name: Push to mirror
+        run: |
+          git push origin master
+          git push origin --tags
