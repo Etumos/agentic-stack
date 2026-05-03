@@ -19,7 +19,7 @@
 #   6. Pushes to origin (Etumos/agentic-stack) on success
 set -euo pipefail
 
-UPSTREAM_URL="https://github.com/codejunkie99/agentic-stack.git"
+UPSTREAM_URL="https://github.com/Etumos/agentic-stack.git"
 UPSTREAM_BRANCH="master"
 
 cd "$(git rev-parse --show-toplevel)"
