@@ -1,0 +1,49 @@
+# etumos/compose-snippets/postgres-many-dbs.yml
+#
+# Single Postgres instance hosting many databases, one per logical workload.
+# Cheaper than spinning up N Postgres containers for CI/dev/auxiliary tools.
+#
+# Pattern (from xbr-analytics #137 + #136 audit):
+# - Production app uses one DB (and N schemas) on this instance
+# - CI gets its own database for migration drift checks
+# - Multi-tenant data lives in named schemas on the same DB
+# - Auxiliary tools (GlitchTip, etc.) get their own database
+#
+# To add a new DB to a running instance:
+#   docker exec -i <pg-container> psql -U postgres -c "
+#     CREATE USER foo_ci WITH PASSWORD 'generated';
+#     CREATE DATABASE foo_ci OWNER foo_ci TEMPLATE template0;
+#     GRANT ALL PRIVILEGES ON DATABASE foo_ci TO foo_ci;
+#   "
+#   # Add the password as a GitHub secret if CI-bound, or to canonical .env if app-bound.
+#
+# template0 (not template1) bypasses the collation-version warnings on Alpine
+# postgres images.
+#
+# WHEN NOT TO USE THIS PATTERN:
+# - Third-party tool that ships with its own Postgres image AND adapting to
+#   shared instance requires forking config (maintenance cost > consolidation win)
+# - Workloads with very different tuning needs (OLAP vs OLTP at the same
+#   instance — rare in our scope)
+# - Compliance / scope separation requirements (e.g., PHI vs non-PHI)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PG_USER:-pgsync}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:?required}
+      POSTGRES_DB: ${PG_DATABASE:-pgsync}     # primary app DB; create others via psql
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${PG_PORT:-5433}:5432"               # 5433 to avoid collision with system postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-pgsync}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
