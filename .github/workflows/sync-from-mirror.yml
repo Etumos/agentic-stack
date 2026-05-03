@@ -30,8 +30,10 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Add public mirror remote
-        run: git remote add mirror https://github.com/Etumos/agentic-stack.git
+      - name: Add public mirror remote (idempotent — workspace persists between runs)
+        run: |
+          git remote remove mirror 2>/dev/null || true
+          git remote add mirror https://github.com/Etumos/agentic-stack.git
 
       - name: Fetch mirror
         run: git fetch mirror master
