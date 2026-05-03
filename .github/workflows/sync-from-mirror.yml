@@ -23,6 +23,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.SYNC_PAT }}   # PAT, not GITHUB_TOKEN — needed to push workflow files
 
       - name: Configure git
         run: |
@@ -66,7 +67,7 @@ jobs:
       - name: Open PR
         if: steps.check.outputs.behind != '0'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.SYNC_PAT }}
         run: |
           STATUS_NOTE=""
           if [ "${{ steps.branch.outputs.merge_status }}" = "conflict" ]; then
