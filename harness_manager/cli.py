@@ -4,6 +4,8 @@ Verbs (subcommands): add, remove, doctor, status, manage, transfer.
 Anything else in first position → treated as an adapter name (existing
 `./install.sh <adapter>` UX preserved).
 """
+from __future__ import annotations  # PEP-604 unions on Python 3.9 (#6)
+
 import argparse
 import os
 import subprocess

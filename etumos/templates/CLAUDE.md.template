@@ -1,0 +1,210 @@
+# <PROJECT_NAME> — Claude Code Rules
+
+These rules are non-negotiable. Read them before taking any action in this repo.
+
+## Context compaction — auto-save state before it hits
+
+Long sessions risk mid-session compaction. At every natural breakpoint — task done, root cause found, decision made — flush state automatically:
+
+1. Update `.agent/memory/working/WORKSPACE.md` with current status and next step
+2. Write any new findings to DOMAIN_KNOWLEDGE, DECISIONS, or LESSONS immediately — **never batch to end of session**
+3. Call `python3 .agent/tools/memory_reflect.py` for anything important that just happened
+
+Auto-flush after: any deploy, any bug fix requiring investigation, any schema change, any session uncovering a new constraint.
+
+After 3+ major actions since the last flush, prompt once: _"Want to run 'save state' before we continue?"_
+
+"Save state" from the user = flush everything immediately, no questions asked.
+
+## Before starting any session — verify state
+
+The `UserPromptSubmit` hook runs `session_start.sh` automatically on first message. It should check:
+1. Branch — warn if on protected branch (main/master), auto-push develop if ahead of origin
+2. Dev server — verify it's running on the expected port
+3. Container health — SSH to host, check critical containers via `docker ps`
+4. Error monitor — check unresolved issues if `<MONITOR>_TOKEN` is set in `.env`
+
+## After every production deploy — verify
+
+1. SSH to host, run: `docker ps | grep <APP>` — confirm container is Up
+2. Check error monitor for any errors triggered by the deploy (wait ~2 minutes for events to appear)
+3. Only then report the deploy as complete
+
+## Overnight agent workflows
+
+Scoped backlog issues can be worked unattended overnight using the `/schedule` skill, which spins up a remote agent on Anthropic's infrastructure independent of any local session.
+
+The session-end hook will surface candidates after 17:00 local. Pattern:
+
+```
+/schedule "in 10m work on issue #N. Branch off develop with feature/N-<slug>,
+implement per the issue body, run <typecheck-cmd> and the smoke suite, push branch,
+open PR with 'Closes #N'. If anything is ambiguous, post a comment on the issue
+asking and exit without merging."
+```
+
+### Always brief the agent with
+- Specific branch name + PR base
+- Exact validation commands
+- Closing keyword (`Closes #N`)
+- Fail-soft: post a comment + exit if ambiguous, never force a guess
+
+Never schedule agents to push directly to `main`/`master` — they go through PR + CI like any other contributor.
+
+## Branching and deploy workflow
+
+**Never push directly to `main`/`master`.** The workflow is:
+1. Work on a feature branch or directly on `develop`
+2. Locally: `bash promote.sh` — auto-deploys staging, runs tests against the freshly-deployed staging, opens a PR develop→main, waits for CI, merges, deploys prod, syncs local develop back at the end
+
+`deploy-staging.sh` can run directly on the host for one-off staging-only experiments. **`deploy.sh` cannot** — it requires `PROMOTE_RUN=1` (set by `promote.sh`) and refuses direct invocation. For genuine emergency where staging is unreachable, `EMERGENCY_DEPLOY=1 bash deploy.sh` overrides the gate and emits an audited warning.
+
+## Issue and feature branch discipline
+
+**Non-trivial work always gets a GitHub issue + feature branch.** Do this automatically — don't ask, don't wait.
+
+### When to create an issue + branch (any one)
+- New feature or capability requested by the user
+- Bug that requires investigation (more than a one-line fix)
+- Schema change or migration
+- New API route or significant route change
+- Anything that will span more than one commit
+
+### Trivial work — issue created and immediately closed
+Every request gets an issue. For trivial work (config fixes, doc updates, single-line corrections, dependency bumps), create the issue, commit directly to develop, then close the issue referencing the commit:
+
+```bash
+gh issue create --title "chore: <description>" --body "<what>"
+# ... commit to develop ...
+gh issue close <N> --comment "Fixed in <commit-sha>"
+```
+
+### The feature branch workflow (non-trivial)
+```bash
+gh issue create --title "feat: <description>" --body "<what and why>"
+git checkout develop && git pull origin develop
+git checkout -b feature/<number>-<short-slug>
+# Work, commit, push
+git push -u origin feature/<number>-<short-slug>
+gh pr create --base develop --head feature/<number>-<short-slug> \
+  --title "<title>" --body "Closes #<number>"
+gh pr merge --merge --delete-branch
+```
+
+Close the issue automatically via `Closes #N` in the PR body. Name branches `feature/`, `fix/`, or `chore/` depending on type.
+
+## Schema changes — mandatory checklist (Prisma)
+
+Every time `prisma/schema.prisma` is modified:
+
+1. Write the migration SQL manually — never run `prisma migrate dev` (non-interactive environment)
+2. Register the migration in `_prisma_migrations` if needed
+3. Run `pnpm exec prisma generate` — **always, no exceptions**
+4. Restart the dev server after generating — running process holds stale client in memory
+5. Verify the generated `.sql` file looks correct before committing
+6. Commit **both** `schema.prisma` and the new migration file together — never one without the other
+7. The CI `migrate-check` job will catch drift, but catch it locally first
+
+If you change `schema.prisma` without running `prisma generate` immediately after: stop and do it now.
+
+## Destructive migrations — two-deploy pattern
+
+Run `/pre-mortem` before authoring any destructive migration.
+
+Destructive SQL (`DROP COLUMN`, `RENAME COLUMN`, `RENAME TABLE`, `ALTER COLUMN TYPE`) breaks the running app the moment the migration executes because deployed code still references the old names. CI `migration-lint` should reject these.
+
+The only safe approach:
+- **Deploy 1**: Add the new column/table alongside the old one (additive migration)
+- **Deploy 2**: After all code is updated and Deploy 1 is stable, remove the old column/table
+
+If a migration is intentionally destructive and both deploys are staged, add `-- safe: two-deploy-confirmed` as the **first line** of the `.sql` file to bypass the CI check.
+
+## .gitignore — check before creating directories
+
+Before creating any new directory with a generic name (`build`, `api`, `public`, `static`, `dist`, `output`, `server`, `lib`, `utils`), grep `.gitignore` for a matching pattern. After any `.gitignore` change, run `git status` to confirm intended files are tracked. Generic ignores have caused production outages from missing routes.
+
+## Adding new infrastructure — audit first
+
+Before adding any new long-running container, database, or auxiliary service to `docker-compose.yml`, pause and check whether an existing service can absorb the new responsibility.
+
+**Decision flow:**
+1. **Does an existing container already provide the same service?**
+   - Postgres? → use the existing instance with a dedicated DB (see `etumos/compose-snippets/postgres-many-dbs.yml`)
+   - HTTP backend? → consider mounting into the existing app as a route, not a new container
+   - Cron / scheduling? → use the existing scheduler if any, not a new cron daemon
+2. **If yes, will consolidation introduce coupling we'd regret?**
+   - Failure-mode coupling matters
+   - Auth/permission scopes can be isolated via separate users + DBs
+3. **If no, the new service is justified — but document the decision in the PR body.** Include: what the service does, why an existing one couldn't, what its failure modes are, what cleanup looks like.
+
+## COMPOSE_DIR docker-compose.yml is NOT git-managed
+
+`git pull` in the repo does NOT update the compose file in COMPOSE_DIR. Whenever `docker-compose.yml` changes in this repo, manually sync to the COMPOSE_DIR before deploying. Skipping this causes "no such service" errors in deploy.sh.
+
+## Secrets management — canonical .env on Unraid
+
+The canonical `.env` lives at `<CANONICAL_HOST>:<CANONICAL_PATH>` (perms `600`, root-owned, dir perms `700`). Local `.env` is a downstream copy. Stop editing local `.env` by hand.
+
+**Sync flows:**
+- `bin/sync-env.sh` — pulls canonical → local. Run after a teammate rotated, or when starting a session post-rotation.
+- `bin/push-env.sh` — pushes local → canonical. Use ONLY when you've intentionally rotated. Diffs key names (not values) before confirming.
+
+Both scripts are symlinks into `etumos/bin/` from the agentic-stack overlay. They read project-specific paths from `.etumos.config.sh` (gitignored).
+
+**Container-affecting secrets** (need ALSO updating in `COMPOSE_DIR/.env` + `docker compose up -d --force-recreate <service>`):
+- `PG_PASSWORD`, `JWT_SECRET`, `ENCRYPTION_KEY`, anything else read at request time by containers.
+
+## CI runner — self-hosted (ACCESS_TOKEN-based)
+
+GHA runs on self-hosted runners using the `myoung34/github-runner` image with `ACCESS_TOKEN`-based registration. See `etumos/compose-snippets/gha-runner-access-token.yml` for the canonical service block.
+
+Auto-recovery cron via `bin/refresh-runners.sh` (symlink from etumos overlay). Detects offline/missing runners, restarts them — entrypoint self-fetches a fresh registration token on the way up.
+
+## Error monitoring
+
+Self-hosted error tracking via GlitchTip (Sentry-API-compatible) at `<MONITOR_URL>`. Set `SENTRY_DSN` in `COMPOSE_DIR/.env`. If missing or empty, all server-side errors are silently swallowed.
+
+## Database backup
+
+`backup.sh` runs `pg_dumpall` via the postgres container and stores compressed dumps. Set up a daily cron on the host:
+
+```
+0 3 * * * bash <PROJECT_PATH>/backup.sh >> <LOG_PATH>/backup.log 2>&1
+```
+
+Backups older than 30 days are automatically deleted.
+
+## Unraid root SSH config — UpdateHostKeys disabled
+
+If running on Unraid: `/root` lives on `/dev/sda1` (vfat boot drive), which doesn't support `link()`. SSH's atomic-update of `~/.ssh/known_hosts` (via hardlink to a `.old` backup) fails with ENOTSUP, surfacing as `Operation not permitted` errors on every `git fetch` during deploy.
+
+Fix: `/root/.ssh/config` should contain `UpdateHostKeys no` (mode 600). Recovery if `/root` is ever wiped:
+```bash
+ssh root@<HOST> "printf 'Host *\n  UpdateHostKeys no\n' > /root/.ssh/config && chmod 600 /root/.ssh/config"
+```
+
+## Infrastructure quick reference
+
+| Service | Port | URL | Schema |
+|---|---|---|---|
+| Admin prod | <PROD_PORT> | http://<HOST>:<PROD_PORT> | <admin_schema> |
+| Admin staging | <STAGING_PORT> | http://<HOST>:<STAGING_PORT> | <admin_staging_schema> |
+| Local dev | <DEV_PORT> | http://localhost:<DEV_PORT> | <admin_dev_schema> |
+| Postgres | 5433 | <HOST>:5433 | (analytics) |
+
+## Rules that override all defaults
+
+- Never force push to protected branches (`main`, `master`, `production`, `staging`).
+- Never delete episodic or semantic memory entries — archive them.
+- Never modify `.agent/protocols/permissions.md` — only humans edit it.
+- Never hand-edit `.agent/memory/semantic/LESSONS.md` — use `graduate.py`.
+- If `REVIEW_QUEUE.md` shows pending > 10 or oldest > 7 days, review candidates before starting substantive work.
+
+---
+
+## Project-specific section (replace below — everything above is the etumos overlay template)
+
+<!-- Add your project-specific rules here: schemas, deploy specifics, business
+     logic constraints, anything that doesn't generalize. The overlay above
+     should NOT be edited project-by-project — file an issue against
+     Etumos/agentic-stack instead. -->

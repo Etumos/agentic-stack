@@ -1,0 +1,42 @@
+# etumos/compose-snippets/gha-runner-access-token.yml
+#
+# Self-hosted GHA runner using long-lived ACCESS_TOKEN auth. Container's
+# entrypoint reads ACCESS_TOKEN (a PAT with `repo` scope) and self-fetches
+# a registration token at every container start. Eliminates per-runner
+# RUNNER_TOKEN env files + the "regenerate token + scp env file" recovery
+# dance.
+#
+# To use:
+#   1. Add this service block to your docker-compose.yml (rename to
+#      gha-runner, gha-runner-2, etc. for parallel runners; each must have
+#      a unique RUNNER_NAME)
+#   2. Set GITHUB_TOKEN (PAT with `repo` scope) in your docker-compose .env
+#   3. profiles: [runner] keeps it opt-in — `docker compose --profile runner up -d`
+#   4. Pair with etumos/bin/refresh-runners.sh for auto-recovery via cron
+#
+# Image tag MUST track GitHub's required minimum agent version. Quarterly
+# review against https://github.com/myoung34/docker-github-actions-runner/releases.
+
+services:
+  gha-runner:
+    image: myoung34/github-runner:2.334.0
+    restart: unless-stopped
+    profiles: [runner]
+    environment:
+      RUNNER_NAME: <unique-per-replica>     # e.g. unraid-1
+      RUNNER_SCOPE: repo                    # naturally isolates to one repo
+      REPO_URL: https://github.com/<org>/<repo>
+      LABELS: <project>,self-hosted
+      EPHEMERAL: "false"                    # workspace cache survives restarts
+      DISABLE_AUTOMATIC_DEREGISTRATION: "false"
+      ACCESS_TOKEN: ${GITHUB_TOKEN}         # the magic — self-registration
+    volumes:
+      - gha_runner_data:/runner-data
+      - /var/run/docker.sock:/var/run/docker.sock   # for `services:` blocks in workflows
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 6g
+    cpus: 4.0
+
+volumes:
+  gha_runner_data:

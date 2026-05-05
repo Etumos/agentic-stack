@@ -1,0 +1,92 @@
+name: Sync from public mirror (PR)
+
+# Pulls Etumos/agentic-stack (public mirror) into this private repo as a
+# pull-request, NOT a direct merge. PR review surfaces what's incoming
+# from upstream so etumos/ overlay conflicts are seen explicitly.
+#
+# Runs daily at 07:00 UTC (1h after the public mirror syncs from codejunkie99)
+# and on manual dispatch.
+
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.SYNC_PAT }}   # PAT, not GITHUB_TOKEN — needed to push workflow files
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Add public mirror remote (idempotent — workspace persists between runs)
+        run: |
+          git remote remove mirror 2>/dev/null || true
+          git remote add mirror https://github.com/Etumos/agentic-stack.git
+
+      - name: Fetch mirror
+        run: git fetch mirror master
+
+      - name: Check if anything to merge
+        id: check
+        run: |
+          BEHIND=$(git rev-list --count HEAD..mirror/master)
+          echo "behind=$BEHIND" >> "$GITHUB_OUTPUT"
+          if [ "$BEHIND" -eq 0 ]; then
+            echo "→ already current with mirror — nothing to PR"
+          else
+            echo "→ behind by $BEHIND commit(s) — opening PR"
+          fi
+
+      - name: Create sync branch
+        if: steps.check.outputs.behind != '0'
+        id: branch
+        run: |
+          BRANCH="sync/upstream-$(date +%Y-%m-%d-%H%M)"
+          echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
+          git checkout -b "$BRANCH"
+          if git merge mirror/master --no-edit; then
+            echo "merge_status=clean" >> "$GITHUB_OUTPUT"
+          else
+            echo "merge_status=conflict" >> "$GITHUB_OUTPUT"
+            # Leave the branch with merge markers so the human can resolve in the PR
+            git add -A
+            git commit -m "WIP: merge upstream — manual conflict resolution needed" --no-verify
+          fi
+          git push origin "$BRANCH"
+
+      - name: Open PR
+        if: steps.check.outputs.behind != '0'
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_PAT }}
+        run: |
+          STATUS_NOTE=""
+          if [ "${{ steps.branch.outputs.merge_status }}" = "conflict" ]; then
+            STATUS_NOTE=":warning: **Merge conflicts** — checkout this branch and resolve manually before merging."
+          fi
+          gh pr create \
+            --base master \
+            --head "${{ steps.branch.outputs.name }}" \
+            --title "sync: pull upstream from mirror ($(date +%Y-%m-%d))" \
+            --body "$(cat <<EOF
+          Automated PR from \`sync-from-mirror.yml\` workflow.
+
+          - Brings in **${{ steps.check.outputs.behind }}** new commit(s) from \`Etumos/agentic-stack\` (public mirror), which itself was synced from \`codejunkie99/agentic-stack\` upstream.
+          - Merge result: **${{ steps.branch.outputs.merge_status }}**
+
+          $STATUS_NOTE
+
+          Review the diff and merge when ready. The \`etumos/\` overlay should never appear in this diff (upstream doesn't touch that path); if it does, something has drifted.
+          EOF
+          )"
