@@ -1,0 +1,40 @@
+name: ADR (Architectural Decision Record)
+description: Capture an architectural decision with context and tradeoffs
+labels: ["type:adr"]
+body:
+  - type: input
+    id: title
+    attributes:
+      label: Decision title
+      placeholder: "Use X for Y because Z"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What problem are we solving, what constraints apply
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision
+      description: What we are doing
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other paths considered and why rejected
+  - type: textarea
+    id: consequences
+    attributes:
+      label: Consequences
+      description: What becomes easier or harder; tradeoffs accepted
+  - type: input
+    id: doc_link
+    attributes:
+      label: Full ADR doc path
+      placeholder: "docs/decisions/YYYY-MM-DD-short-name.md"

@@ -1,0 +1,29 @@
+name: Deferred work (with deadline)
+description: Parked work that MUST be revisited by a specific date
+labels: ["type:deferred"]
+body:
+  - type: input
+    id: title
+    attributes:
+      label: What's parked
+    validations:
+      required: true
+  - type: textarea
+    id: why_now
+    attributes:
+      label: Why parked, why now
+      description: What's blocking; what changes when you revisit
+    validations:
+      required: true
+  - type: input
+    id: deadline
+    attributes:
+      label: Deadline (REQUIRED — also set in Project Deadline field; digest will surface)
+      placeholder: "2026-MM-DD"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: State at park time
+      description: Enough that whoever picks this up doesn't re-discover

@@ -1,0 +1,34 @@
+name: Epic (cross-repo)
+description: Multi-issue program spanning >1 repo in the fleet
+labels: ["type:epic"]
+body:
+  - type: input
+    id: title
+    attributes:
+      label: Epic name
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal + done-criteria
+      description: What "done" looks like, measurably
+    validations:
+      required: true
+  - type: textarea
+    id: child_tickets
+    attributes:
+      label: Child tickets
+      description: One per affected repo, format `owner/repo#N`. Use `Blocked-By` field to wire them.
+    validations:
+      required: true
+  - type: input
+    id: deadline
+    attributes:
+      label: Deadline (set in Project Deadline field too)
+      placeholder: "2026-MM-DD"
+  - type: textarea
+    id: rollback
+    attributes:
+      label: Rollback plan
+      description: How to back out if this fails mid-flight
