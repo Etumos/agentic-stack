@@ -11,23 +11,23 @@ When filing a new issue:
 
 ```
 Does the work affect multiple projects or the shared stack?
-├─ YES → Etumos/agentic-stack-private (stack-level concerns, shared infra, contracts)
+├─ YES → <private-stack-repo> (stack-level concerns, shared infra, contracts)
 │        Examples: cross-project relay protocol, fleet endpoint changes, shared memory conventions
 └─ NO
    ├─ Is it jarvis-obsidian work?
-   │  └─ YES → Etumos/jarvis-obsidian
+   │  └─ YES → <jarvis-project>
    │           Examples: vault sync, operator scripts, agent learnings
    │
-   ├─ Is it xbr-analytics work?
-   │  └─ YES → xbr-ai/xbr-analytics
+   ├─ Is it analytics work?
+   │  └─ YES → <analytics-project>
    │           Examples: analytics pipeline, BI dashboard, data schema
    │
-   ├─ Is it xbr-dashboard-template work?
-   │  └─ YES → xbr-ai/xbr-dashboard-template
+   ├─ Is it dashboard-template work?
+   │  └─ YES → <dashboard-template-project>
    │           Examples: dashboard UI, customer tenant onboarding, template refactor
    │
    ├─ Is it SEO agent work?
-   │  └─ YES → Etumos/seo-master-agent
+   │  └─ YES → <seo-agent-project>
    │           Examples: tenant routing, SEO scoring, brand-specific logic
    │
    ├─ Is it infrastructure/host work?
@@ -38,15 +38,13 @@ Does the work affect multiple projects or the shared stack?
       └─ In project X repo (self-hosted runner patterns are project-scoped)
 ```
 
-**Key principle:** If uncertain, file in agentic-stack-private with a "follows-to: <project>" label or comment linking the follow-on. Stack maintainer (@Etumos) will triage.
+**Key principle:** If uncertain, file in the private stack repo with a "follows-to: <project>" label or comment linking the follow-on. Stack maintainer will triage.
 
 ---
 
 ## Valid Labels by Repository
 
-### Etumos/agentic-stack-private
-
-**Source:** `gh label list --repo Etumos/agentic-stack-private` (2026-05-20)
+### Private stack repo
 
 | Label | Semantics | Examples |
 |-------|-----------|----------|
@@ -69,9 +67,7 @@ Does the work affect multiple projects or the shared stack?
 
 ---
 
-### Etumos/jarvis-obsidian
-
-**Source:** `gh label list --repo Etumos/jarvis-obsidian` (2026-05-20)
+### Jarvis project
 
 | Label | Semantics | When to use |
 |-------|-----------|-------------|
@@ -79,7 +75,6 @@ Does the work affect multiple projects or the shared stack?
 | `documentation` | Improvements or additions to documentation | Update AGENTS.project.md, add runbook, clarify memory conventions |
 | `research-spike` | Time-boxed investigation for Jarvis to research and close | "Is LiveSync performance acceptable at scale?" |
 | `agentic-stack` | Follow-on work targets this project | Filed in stack-private; this is a dependent sub-issue |
-| `xbr-analytics`, `xbr-dashboard-template`, etc. | Follow-on work targets that project | Cross-project impact signaling |
 | `human-input` | Blocked on human decision or action | Awaiting operator decision on memory archival strategy |
 | `needs-human-decision` | Auto-research ADR drafted — awaiting human adopt/skip/defer decision | Agent filed spike; operator must decide |
 | `status:accepted` | Owner has verdict + execution sub-issue filed | Ready to work |
@@ -90,9 +85,7 @@ Does the work affect multiple projects or the shared stack?
 
 ---
 
-### xbr-ai/xbr-analytics
-
-**Source:** `gh label list --repo xbr-ai/xbr-analytics` (2026-05-20)
+### Analytics project
 
 | Label | Semantics | When to use |
 |-------|-----------|-------------|
@@ -116,9 +109,7 @@ Does the work affect multiple projects or the shared stack?
 
 ---
 
-### xbr-ai/xbr-dashboard-template
-
-**Source:** `gh label list --repo xbr-ai/xbr-dashboard-template` (2026-05-20)
+### Dashboard template project
 
 | Label | Semantics | When to use |
 |-------|-----------|-------------|
@@ -129,7 +120,7 @@ Does the work affect multiple projects or the shared stack?
 | `human-input` | Blocked on human decision or action | Awaiting design/product decision |
 | `sev:0`, `sev:1`, `sev:2`, `sev:3` | Severity levels | |
 | `release-blocker:tenant-2` | Must-resolve before next customer onboarding | Critical path blocker |
-| `blocked` | Blocked waiting on dependency | Blocked by xbr-analytics#789 |
+| `blocked` | Blocked waiting on dependency | Blocked on dependency |
 | `infra` | Infrastructure or platform | CI/CD pipeline, deployment tooling |
 | `security` | Security concern or fix | XSS vulnerability, auth bypass |
 | `agent` | Agent-related work or filed by agent | Agent-filed ticket or work on agent integration |
@@ -140,9 +131,7 @@ Does the work affect multiple projects or the shared stack?
 
 ---
 
-### Etumos/seo-master-agent
-
-**Source:** `gh label list --repo Etumos/seo-master-agent` (2026-05-20)
+### SEO agent project
 
 | Label | Semantics | When to use |
 |-------|-----------|-------------|
@@ -150,7 +139,7 @@ Does the work affect multiple projects or the shared stack?
 | `human-input` | Blocked on human decision | Awaiting decision |
 | `status:*` | Status workflow (`proposed`, `researching`, `accepted`, `executing`, `deferred`, `done`) | Use consistently |
 | `sev:0`, `sev:1`, `sev:2`, `sev:3` | Severity levels | Priority signaling |
-| `brand:c76`, `brand:xbr`, `brand:whwc` | Tenant/brand scoping | Crucible76.com, xbr.ai, wholehomewellnessco.com |
+| `brand:c76`, `brand:xbr`, `brand:whwc` | Tenant/brand scoping | Brand-specific work items |
 | `audit` | Audit ticket or response | Compliance or security audit |
 | `migration` | Unraid→Proxmox migration work | VM provisioning, data migration |
 | `blocked` | Blocked waiting on dependency | Blocked by another ticket |
@@ -160,8 +149,6 @@ Does the work affect multiple projects or the shared stack?
 ---
 
 ### Etumos/proxmox-manager
-
-**Source:** `gh label list --repo Etumos/proxmox-manager` (2026-05-20)
 
 | Label | Semantics | When to use |
 |-------|-----------|-------------|
@@ -184,12 +171,12 @@ Does the work affect multiple projects or the shared stack?
 
 | Type | Required Labels | Examples |
 |------|-----------------|----------|
-| **Bug** | `bug` + severity (`sev:0` if critical) | `bug`, `sev:2` (for analytics) or just `bug` (for Jarvis) |
+| **Bug** | `bug` + severity (`sev:0` if critical) | `bug`, `sev:2` |
 | **ADR / Spec** | `enhancement` or `spike` + `status:proposed` | Stack-level decision → `enhancement`, `status:proposed` |
 | **Spike (research-only)** | `research-spike` or `spike` | Time-boxed research, decision expected |
 | **Security Finding** | `security` (where label exists) + severity | `security`, `sev:0` or `sev:1` |
 | **Operator-blocked** | `human-input` or `needs-human-decision` | Waiting for operator decision |
-| **Cross-project impact** | Project labels (`agentic-stack`, `xbr-analytics`, etc.) | File in primary repo + label links to dependents |
+| **Cross-project impact** | Project labels | File in primary repo + label links to dependents |
 
 ---
 
@@ -201,12 +188,12 @@ Does the work affect multiple projects or the shared stack?
 docs/decisions/YYYY-MM-DD-<slug>.md
 ```
 
-**Example:** `docs/decisions/2026-05-18-deploy-pipeline-jarvis-tpm.md`
+**Example:** `docs/decisions/YYYY-MM-DD-<slug>.md`
 
 **Frontmatter (optional but recommended):**
 ```markdown
 ---
-date: 2026-05-18
+date: YYYY-MM-DD
 author: <GitHub username>
 status: accepted  # accepted | proposed | superseded | archived
 relates-to:
@@ -225,7 +212,7 @@ docs/specs/YYYY-MM-DD-<slug>.md
 **Frontmatter:**
 ```markdown
 ---
-date: 2026-05-20
+date: YYYY-MM-DD
 author: <GitHub username>
 epic: <issue-number>  # if part of larger epic
 relates-to:
@@ -269,18 +256,18 @@ python3 .agent/tools/memory_reflect.py "Decided: <summary>" --category architect
 
 ## Cross-References
 
-- **Stack contract specs:** Etumos/agentic-stack-private → `docs/canonical/CONTRACTS.md` (if not present, request via issue)
+- **Stack contract specs:** Private stack repo → `docs/canonical/CONTRACTS.md` (if not present, request via issue)
 - **Fleet endpoints:** See `docs/canonical/fleet-endpoints.md` (this repo)
 - **Memory conventions:** See `.agent/AGENTS.md` + `CLAUDE.md` in each project
 - **CI/CD runbooks:** See project-specific `docs/runbooks/` + shared `~/Projects/agentic-stack/docs/runbooks/`
-- **Original draft:** Etumos/jarvis-obsidian PR #256 (merged 2026-05-20, homed here per operator decision)
+- **Original draft:** Internal PR (merged 2026-05-20, homed here per operator decision)
 
 ---
 
 ## Operator Checklist for Filing Issues
 
 - [ ] Is the work stack-level (affects multiple projects) or single-project?
-  - Stack-level → Etumos/agentic-stack-private
+  - Stack-level → private stack repo
   - Single-project → that project's repo
 - [ ] Are the required labels present? (See "Required Label Patterns" table)
 - [ ] For bugs: Include minimal reproducible example (MRE) and error logs
